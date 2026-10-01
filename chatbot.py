@@ -1,32 +1,59 @@
+import os
+import json
+from dotenv import load_dotenv
+from openai import OpenAI
 
+load_dotenv()
+
+api_key = os.getenv("OPENROUTER_API_KEY")
+
+client = OpenAI(
+    base_url="https://openrouter.ai/api/v1",
+    api_key=api_key
+)
 
 
 #education agent function
 
-def education_agent():
-    print("Are you looking for NEET UG or NEET PG leads?")
+def education_agent(data):
+    category = data["category"]
+    location = data["location"]
+    quantity = data["quantity"]
 
-    category = input("You: ").lower()
+    if category is None:
+        print("Are you looking for NEET UG or NEET PG leads?")
 
-    if "neet ug" in category:
-        category = "NEET UG"
-    elif "neet pg" in category:
-        category = "NEET PG"
-    else:
-        print("Please specify NEET UG or NEET PG.")
-        return
+        category = input("You: ").lower()
 
-    print("Which location are you looking for?")
-    location = input("You: ")
+        if "neet ug" in category:
+            category = "NEET UG"
+        elif "neet pg" in category:
+            category = "NEET PG"
+        else:
+            print("Please specify NEET UG or NEET PG.")
+            return
 
-    print("How many leads do you need?")
-    quantity = input("You: ")
+    if location is None:
+        print("Which location are you looking for?")
+        location = input("You: ")
+
+    if quantity is None:
+        print("How many leads do you need?")
+        quantity = input("You: ")
 
     print("\nHere is the information I collected:")
     print("Service:", "Education Data")
     print("Category:", category)
     print("Location:", location)
     print("Lead Quantity:", quantity)
+
+    data["category"] = category
+    data["location"] = location
+    data["quantity"] = quantity
+
+    return data
+
+
 
 
 #loan agent function
@@ -133,6 +160,92 @@ def detect_intent(user_input):
         return "unknown"
 
 
+def detect_intent_with_llm(user_input):
+    response = client.chat.completions.create(
+        model="openrouter/free",
+        messages=[
+            {
+                "role": "system",
+                "content": """
+    You are an intent classification system.
+
+    Classify the user's message into exactly ONE of these categories:
+
+    education
+    loan
+    real_estate
+    communication
+    unknown
+
+    Return ONLY the category name.
+    Do not explain your answer.
+    """
+            },
+            {
+                "role": "user",
+                "content": user_input
+            }
+        ]
+    )
+
+    intent = response.choices[0].message.content.strip().lower()
+
+    return intent
+
+
+
+def extract_information(user_input):
+
+    response = client.chat.completions.create(
+        model="openrouter/free",
+        messages=[
+            {
+                "role": "system",
+                "content": """
+                    You are a data extraction system for a business chatbot.
+
+                    Extract the following information from the user's message:
+
+                    1. intent
+                    2. category
+                    3. location
+                    4. quantity
+
+                    The intent must be exactly one of:
+
+                    education
+                    loan
+                    real_estate
+                    communication
+                    unknown
+
+                    For education:
+                    - category can be NEET UG or NEET PG.
+
+                    For real estate:
+                    - category can be residential or commercial.
+
+                    If a piece of information is not provided, use null.
+
+                    Return ONLY valid JSON.
+                    Do not explain anything.
+                    """
+            },
+            {
+                "role": "user",
+                "content": user_input
+            }
+        ]
+    )
+
+    result = response.choices[0].message.content
+
+    result = result.replace("```json", "").replace("```", "").strip()
+
+    data = json.loads(result)
+
+    return data
+
 
 
 print("Hello! I am your chatbot.")
@@ -144,10 +257,13 @@ while True:
         print("Goodbye!")
         break
 
-    intent = detect_intent(user_input)
+    data = extract_information(user_input)
+
+    intent = data["intent"]
 
     if intent == "education":
-        education_agent()
+        lead = education_agent(data)
+        print(lead)
 
     elif intent == "loan":
         loan_agent()
