@@ -224,6 +224,9 @@ if st.session_state.current_intent == "onboarding":
             and onboarding_data.get("aadhaar_status") == "received"
         )
 
+        st.write("DEBUG msme_required:", onboarding_data.get("msme_required"))
+        st.write("DEBUG type:", type(onboarding_data.get("msme_required")))
+
         msme_complete = (
             onboarding_data.get("msme_required") is False
             or onboarding_data.get("msme_status") == "received"
