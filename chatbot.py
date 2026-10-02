@@ -16,42 +16,36 @@ client = OpenAI(
 #education agent function
 
 def education_agent(data):
+
     category = data["category"]
     location = data["location"]
     quantity = data["quantity"]
 
     if category is None:
-        print("Are you looking for NEET UG or NEET PG leads?")
-
-        category = input("You: ").lower()
-
-        if "neet ug" in category:
-            category = "NEET UG"
-        elif "neet pg" in category:
-            category = "NEET PG"
-        else:
-            print("Please specify NEET UG or NEET PG.")
-            return
+        return {
+            "status": "incomplete",
+            "missing": "category",
+            "data": data
+        }
 
     if location is None:
-        print("Which location are you looking for?")
-        location = input("You: ")
+        return {
+            "status": "incomplete",
+            "missing": "location",
+            "data": data
+        }
 
     if quantity is None:
-        print("How many leads do you need?")
-        quantity = input("You: ")
+        return {
+            "status": "incomplete",
+            "missing": "quantity",
+            "data": data
+        }
 
-    print("\nHere is the information I collected:")
-    print("Service:", "Education Data")
-    print("Category:", category)
-    print("Location:", location)
-    print("Lead Quantity:", quantity)
-
-    data["category"] = category
-    data["location"] = location
-    data["quantity"] = quantity
-
-    return data
+    return {
+        "status": "complete",
+        "data": data
+    }
 
 
 
@@ -66,30 +60,33 @@ def loan_agent(data):
 
     if category is not None and category.lower() == "loan":
         category = None
+        data["category"] = None
 
     if category is None:
-        print("What type of loan leads are you looking for?")
-        category = input("You: ")
+        return {
+            "status": "incomplete",
+            "missing": "category",
+            "data": data
+        }
 
     if location is None:
-        print("Which location are you looking for?")
-        location = input("You: ")
+        return {
+            "status": "incomplete",
+            "missing": "location",
+            "data": data
+        }
 
     if quantity is None:
-        print("How many leads do you need?")
-        quantity = input("You: ")
+        return {
+            "status": "incomplete",
+            "missing": "quantity",
+            "data": data
+        }
 
-    print("\nHere is the information I collected:")
-    print("Service:", "Loan Data")
-    print("Loan Type:", category)
-    print("Location:", location)
-    print("Lead Quantity:", quantity)
-
-    data["category"] = category
-    data["location"] = location
-    data["quantity"] = quantity
-
-    return data
+    return {
+        "status": "complete",
+        "data": data
+    }
 
 
 
@@ -103,30 +100,33 @@ def real_estate_agent(data):
 
     if category is not None and category.lower() == "real estate":
         category = None
+        data["category"] = None
 
     if category is None:
-        print("Are you looking for residential or commercial real estate leads?")
-        category = input("You: ")
+        return {
+            "status": "incomplete",
+            "missing": "category",
+            "data": data
+        }
 
     if location is None:
-        print("Which location are you interested in?")
-        location = input("You: ")
+        return {
+            "status": "incomplete",
+            "missing": "location",
+            "data": data
+        }
 
     if quantity is None:
-        print("How many leads do you need?")
-        quantity = input("You: ")
+        return {
+            "status": "incomplete",
+            "missing": "quantity",
+            "data": data
+        }
 
-    print("\nHere is the information I collected:")
-    print("Service:", "Real Estate Data")
-    print("Property Type:", category)
-    print("Location:", location)
-    print("Lead Quantity:", quantity)
-
-    data["category"] = category
-    data["location"] = location
-    data["quantity"] = quantity
-
-    return data
+    return {
+        "status": "complete",
+        "data": data
+    }
 
 
 
@@ -138,39 +138,23 @@ def communication_agent(data):
     quantity = data["quantity"]
 
     if category is None:
-        print("Which communication service are you interested in?")
-        print("Bulk SMS, RCS SMS, Voice, WhatsApp, IVR, or Toll-Free?")
-
-        category = input("You: ").lower()
-
-        if "bulk sms" in category:
-            category = "Bulk SMS"
-        elif "rcs" in category:
-            category = "RCS SMS"
-        elif "voice" in category:
-            category = "Voice OBD/IBD"
-        elif "whatsapp" in category:
-            category = "WhatsApp"
-        elif "ivr" in category:
-            category = "IVR"
-        elif "toll" in category:
-            category = "Toll-Free"
-        else:
-            print("Sorry, I don't recognize that communication service.")
-            return
+        return {
+            "status": "incomplete",
+            "missing": "category",
+            "data": data
+        }
 
     if quantity is None:
-        print("What is the approximate number of customers/recipients?")
-        quantity = input("You: ")
+        return {
+            "status": "incomplete",
+            "missing": "quantity",
+            "data": data
+        }
 
-    print("\nHere is the information I collected:")
-    print("Service:", category)
-    print("Recipient Quantity:", quantity)
-
-    data["category"] = category
-    data["quantity"] = quantity
-
-    return data
+    return {
+        "status": "complete",
+        "data": data
+    }
 
 
 
@@ -237,7 +221,7 @@ def detect_intent_with_llm(user_input):
 
 
 
-def extract_information(user_input):
+def extract_information(user_input, conversation_history):
 
     response = client.chat.completions.create(
         model="openrouter/free",
@@ -295,6 +279,24 @@ def extract_information(user_input):
                     - If no quantity is given, use null.
 
                     If any information is not provided, use null.
+                    Use information from previous messages in the conversation when the latest message provides only a missing value.
+
+                    For example:
+
+                    Previous message:
+                    "I need loan leads."
+
+                    Latest message:
+                    "Personal Loan"
+
+                    The result should be:
+
+                    {
+                        "intent": "loan",
+                        "category": "Personal Loan",
+                        "location": null,
+                        "quantity": null
+                    }
                     Do not invent missing information.
                     Do not copy the entire user message into a field.
 
@@ -328,7 +330,15 @@ def extract_information(user_input):
             },
             {
                 "role": "user",
-                "content": user_input
+                "content": f"""
+                    Conversation history:
+                    {conversation_history}
+
+                    Latest user message:
+                    {user_input}
+
+                    Use the conversation history and the latest message together to extract the information.
+                    """
             }
         ]
     )
@@ -345,30 +355,114 @@ def extract_information(user_input):
 #main chatbot loop
 print("Hello! I am your chatbot.")
 
-while True:
-    user_input = input("You: ").lower()
+conversation_history = []
 
-    if "bye" in user_input:
+while True:
+
+    user_input = input("You: ")
+
+    if "bye" in user_input.lower():
         print("Goodbye!")
         break
 
-    data = extract_information(user_input)
+    conversation_history.append({
+        "role": "user",
+        "content": user_input
+    })
+
+    data = extract_information(user_input, conversation_history)
 
     intent = data["intent"]
 
     if intent == "education":
-        lead = education_agent(data)
-        print(lead)
+        result = education_agent(data)
+
     elif intent == "loan":
-        lead = loan_agent(data)
-        print(lead)
+        result = loan_agent(data)
+
     elif intent == "real_estate":
-        lead = real_estate_agent(data)
-        print(lead)
+        result = real_estate_agent(data)
+
     elif intent == "communication":
-        lead = communication_agent(data)
-        print(lead)
-    elif "hello" in user_input or "hi" in user_input:
-        print("Hello! How can I help you today?")
+        result = communication_agent(data)
+
     else:
-        print("Sorry, I don't understand your request yet.") 
+        print("Sorry, I don't understand your request yet.")
+        continue
+
+    if result["status"] == "incomplete":
+
+        missing = result["missing"]
+
+        if intent == "education":
+
+            if missing == "category":
+                print("Are you looking for NEET UG or NEET PG leads?")
+
+            elif missing == "location":
+                print("Which location are you looking for?")
+
+            elif missing == "quantity":
+                print("How many leads do you need?")
+
+        elif intent == "loan":
+
+            if missing == "category":
+                print("What type of loan leads are you looking for?")
+
+            elif missing == "location":
+                print("Which location are you looking for?")
+
+            elif missing == "quantity":
+                print("How many leads do you need?")
+
+        elif intent == "real_estate":
+
+            if missing == "category":
+                print("Are you looking for residential or commercial real estate leads?")
+
+            elif missing == "location":
+                print("Which location are you interested in?")
+
+            elif missing == "quantity":
+                print("How many leads do you need?")
+
+        elif intent == "communication":
+
+            if missing == "category":
+                print("Which communication service are you interested in?")
+                print("Bulk SMS, RCS SMS, Voice, WhatsApp, IVR, or Toll-Free?")
+
+            elif missing == "quantity":
+                print("What is the approximate number of customers/recipients?")
+
+    else:
+
+        lead = result["data"]
+
+        print("\nHere is the information I collected:")
+
+        if intent == "education":
+            print("Service:", "Education Data")
+            print("Category:", lead["category"])
+            print("Location:", lead["location"])
+            print("Lead Quantity:", lead["quantity"])
+
+        elif intent == "loan":
+            print("Service:", "Loan Data")
+            print("Loan Type:", lead["category"])
+            print("Location:", lead["location"])
+            print("Lead Quantity:", lead["quantity"])
+
+        elif intent == "real_estate":
+            print("Service:", "Real Estate Data")
+            print("Property Type:", lead["category"])
+            print("Location:", lead["location"])
+            print("Lead Quantity:", lead["quantity"])
+
+        elif intent == "communication":
+            print("Service:", lead["category"])
+            print("Recipient Quantity:", lead["quantity"])
+
+        print("\nStructured Lead Data:")
+        print(lead) 
