@@ -7,12 +7,23 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+try:
+    import streamlit as st
+
+    if hasattr(st, "secrets") and st.secrets:
+        secrets = st.secrets
+    else:
+        secrets = {}
+
+except Exception:
+    secrets = {}
+
 DB_CONFIG = {
-    "host": os.getenv("DB_HOST", "localhost"),
-    "database": os.getenv("DB_NAME", "ai_chatbot"),
-    "user": os.getenv("DB_USER", "postgres"),
-    "password": os.getenv("DB_PASSWORD"),
-    "port": os.getenv("DB_PORT", "5432")
+    "host": secrets.get("DB_HOST", os.getenv("DB_HOST", "localhost")),
+    "database": secrets.get("DB_NAME", os.getenv("DB_NAME", "ai_chatbot")),
+    "user": secrets.get("DB_USER", os.getenv("DB_USER", "postgres")),
+    "password": secrets.get("DB_PASSWORD", os.getenv("DB_PASSWORD")),
+    "port": secrets.get("DB_PORT", os.getenv("DB_PORT", "5432"))
 }
 
 
