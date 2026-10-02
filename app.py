@@ -308,7 +308,7 @@ if user_input:
 
     # Show structured lead when complete
 
-    if result["complete"]:
+    if result["complete"] and result["lead"] is not None:
 
         st.success("Lead information collected successfully!")
 
