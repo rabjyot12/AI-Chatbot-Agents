@@ -232,11 +232,16 @@ if st.session_state.current_intent == "onboarding":
             or onboarding_data.get("msme_status") == "received"
         )
 
+        st.write("DEBUG required_complete:", required_complete)
+        st.write("DEBUG msme_complete:", msme_complete)
+        st.write("DEBUG onboarding_data:", onboarding_data)
+
         if required_complete and msme_complete:
 
             onboarding_data["onboarding_status"] = "complete"
 
             try:
+                st.write("DEBUG: Saving onboarding:", onboarding_data)
 
                 onboarding_id = save_onboarding(onboarding_data)
 
