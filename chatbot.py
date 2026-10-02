@@ -221,7 +221,7 @@ def detect_intent_with_llm(user_input):
 
 
 
-def extract_information(user_input, conversation_history):
+def extract_information(user_input, conversation_history, current_data=None):
 
     response = client.chat.completions.create(
         model="openrouter/free",
@@ -279,7 +279,8 @@ def extract_information(user_input, conversation_history):
                     - If no quantity is given, use null.
 
                     If any information is not provided, use null.
-                    Use information from previous messages in the conversation when the latest message provides only a missing value.
+                    If the latest message is a new request, do not copy missing values from an older completed request.
+                    Only use previous information when it belongs to the current unfinished request.
 
                     For example:
 
@@ -331,13 +332,19 @@ def extract_information(user_input, conversation_history):
             {
                 "role": "user",
                 "content": f"""
-                    Conversation history:
-                    {conversation_history}
+                    Current request information:
+                    {current_data}
 
                     Latest user message:
                     {user_input}
 
-                    Use the conversation history and the latest message together to extract the information.
+                    Extract information from the latest user message.
+
+                    If Current request information contains already collected fields, keep those fields.
+
+                    Do NOT copy values from older completed requests in the conversation history.
+
+                    If a field has not been provided for the current request, return null.
                     """
             }
         ]
@@ -345,9 +352,29 @@ def extract_information(user_input, conversation_history):
 
     result = response.choices[0].message.content
 
+    if not result:
+        print("The AI returned an empty response.")
+        return {
+            "intent": "unknown",
+            "category": None,
+            "location": None,
+            "quantity": None
+        }
+
     result = result.replace("```json", "").replace("```", "").strip()
 
-    data = json.loads(result)
+    try:
+        data = json.loads(result)
+    except json.JSONDecodeError:
+        print("The AI returned invalid JSON:")
+        print(result)
+
+        return {
+            "intent": "unknown",
+            "category": None,
+            "location": None,
+            "quantity": None
+        }
 
     return data
 
@@ -356,7 +383,8 @@ def extract_information(user_input, conversation_history):
 print("Hello! I am your chatbot.")
 
 conversation_history = []
-
+current_intent = None
+current_data = None
 while True:
 
     user_input = input("You: ")
@@ -370,9 +398,40 @@ while True:
         "content": user_input
     })
 
-    data = extract_information(user_input, conversation_history)
+    data = extract_information(
+        user_input,
+        conversation_history,
+        current_data
+    )
 
-    intent = data["intent"]
+    detected_intent = data["intent"]
+
+    if current_intent is None:
+
+        if detected_intent == "unknown":
+            print("Sorry, I don't understand your request yet.")
+            continue
+
+        current_intent = detected_intent
+        current_data = data
+
+    else:
+
+        if detected_intent != current_intent and detected_intent != "unknown":
+
+            current_intent = detected_intent
+            current_data = data
+
+        else:
+
+            current_data.update({
+                key: value
+                for key, value in data.items()
+                if value is not None
+            })
+
+    intent = current_intent
+    data = current_data
 
     if intent == "education":
         result = education_agent(data)
@@ -466,3 +525,6 @@ while True:
 
         print("\nStructured Lead Data:")
         print(lead) 
+
+        current_intent = None
+        current_data = None
