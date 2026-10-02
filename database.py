@@ -67,33 +67,57 @@ def create_table():
 
 def save_lead(lead):
 
-    connection = get_connection()
-    cursor = connection.cursor()
+    connection = None
+    cursor = None
 
-    cursor.execute("""
-        INSERT INTO leads (
-            intent,
-            category,
-            location,
-            quantity
-        )
-        VALUES (%s, %s, %s, %s)
-        RETURNING id;
-    """, (
-        lead["intent"],
-        lead["category"],
-        lead["location"],
-        lead["quantity"]
-    ))
+    try:
 
-    lead_id = cursor.fetchone()[0]
+        connection = get_connection()
+        cursor = connection.cursor()
 
-    connection.commit()
+        print("LEAD BEING SAVED:")
+        print(lead)
 
-    cursor.close()
-    connection.close()
+        cursor.execute("""
+            INSERT INTO leads (
+                intent,
+                category,
+                location,
+                quantity
+            )
+            VALUES (%s, %s, %s, %s)
+            RETURNING id;
+        """, (
+            lead["intent"],
+            lead["category"],
+            lead["location"],
+            lead["quantity"]
+        ))
 
-    return lead_id
+        lead_id = cursor.fetchone()[0]
+
+        connection.commit()
+
+        return lead_id
+
+    except Exception as e:
+
+        if connection:
+            connection.rollback()
+
+        print("DATABASE ERROR:")
+        print(type(e).__name__)
+        print(str(e))
+
+        raise e
+
+    finally:
+
+        if cursor:
+            cursor.close()
+
+        if connection:
+            connection.close()
 
 
 def get_all_leads():
