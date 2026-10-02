@@ -58,76 +58,119 @@ def education_agent(data):
 
 #loan agent function
 
-def loan_agent():
-    print("What type of loan leads are you looking for?")
+def loan_agent(data):
 
-    loan_type = input("You: ")
+    category = data["category"]
+    location = data["location"]
+    quantity = data["quantity"]
 
-    print("Which location are you looking for?")
-    location = input("You: ")
+    if category is not None and category.lower() == "loan":
+        category = None
 
-    print("How many leads do you need?")
-    quantity = input("You: ")
+    if category is None:
+        print("What type of loan leads are you looking for?")
+        category = input("You: ")
+
+    if location is None:
+        print("Which location are you looking for?")
+        location = input("You: ")
+
+    if quantity is None:
+        print("How many leads do you need?")
+        quantity = input("You: ")
 
     print("\nHere is the information I collected:")
     print("Service:", "Loan Data")
-    print("Loan Type:", loan_type)
+    print("Loan Type:", category)
     print("Location:", location)
     print("Lead Quantity:", quantity)
+
+    data["category"] = category
+    data["location"] = location
+    data["quantity"] = quantity
+
+    return data
 
 
 
 #real estate agent function
 
-def real_estate_agent():
-    print("Are you looking for residential or commercial real estate leads?")
+def real_estate_agent(data):
 
-    property_type = input("You: ")
+    category = data["category"]
+    location = data["location"]
+    quantity = data["quantity"]
 
-    print("Which location are you interested in?")
-    location = input("You: ")
+    if category is not None and category.lower() == "real estate":
+        category = None
 
-    print("How many leads do you need?")
-    quantity = input("You: ")
+    if category is None:
+        print("Are you looking for residential or commercial real estate leads?")
+        category = input("You: ")
+
+    if location is None:
+        print("Which location are you interested in?")
+        location = input("You: ")
+
+    if quantity is None:
+        print("How many leads do you need?")
+        quantity = input("You: ")
 
     print("\nHere is the information I collected:")
     print("Service:", "Real Estate Data")
-    print("Property Type:", property_type)
+    print("Property Type:", category)
     print("Location:", location)
     print("Lead Quantity:", quantity)
+
+    data["category"] = category
+    data["location"] = location
+    data["quantity"] = quantity
+
+    return data
 
 
 
 #communication agent function
 
-def communication_agent():
-    print("Which communication service are you interested in?")
-    print("Bulk SMS, RCS SMS, Voice, WhatsApp, IVR, or Toll-Free?")
+def communication_agent(data):
 
-    service = input("You: ").lower()
+    category = data["category"]
+    quantity = data["quantity"]
 
-    if "bulk sms" in service:
-        service = "Bulk SMS"
-    elif "rcs" in service:
-        service = "RCS SMS"
-    elif "voice" in service:
-        service = "Voice OBD/IBD"
-    elif "whatsapp" in service:
-        service = "WhatsApp"
-    elif "ivr" in service:
-        service = "IVR"
-    elif "toll" in service:
-        service = "Toll-Free"
-    else:
-        print("Sorry, I don't recognize that communication service.")
-        return
+    if category is None:
+        print("Which communication service are you interested in?")
+        print("Bulk SMS, RCS SMS, Voice, WhatsApp, IVR, or Toll-Free?")
 
-    print("What is the approximate number of customers/recipients?")
-    quantity = input("You: ")
+        category = input("You: ").lower()
+
+        if "bulk sms" in category:
+            category = "Bulk SMS"
+        elif "rcs" in category:
+            category = "RCS SMS"
+        elif "voice" in category:
+            category = "Voice OBD/IBD"
+        elif "whatsapp" in category:
+            category = "WhatsApp"
+        elif "ivr" in category:
+            category = "IVR"
+        elif "toll" in category:
+            category = "Toll-Free"
+        else:
+            print("Sorry, I don't recognize that communication service.")
+            return
+
+    if quantity is None:
+        print("What is the approximate number of customers/recipients?")
+        quantity = input("You: ")
 
     print("\nHere is the information I collected:")
-    print("Service:", service)
+    print("Service:", category)
     print("Recipient Quantity:", quantity)
+
+    data["category"] = category
+    data["quantity"] = quantity
+
+    return data
 
 
 
@@ -204,7 +247,7 @@ def extract_information(user_input):
                 "content": """
                     You are a data extraction system for a business chatbot.
 
-                    Extract the following information from the user's message:
+                    Extract exactly these fields from the user's message:
 
                     1. intent
                     2. category
@@ -212,23 +255,75 @@ def extract_information(user_input):
                     4. quantity
 
                     The intent must be exactly one of:
-
                     education
                     loan
                     real_estate
                     communication
                     unknown
 
+                    CATEGORY RULES:
+
                     For education:
-                    - category can be NEET UG or NEET PG.
+                    - NEET UG -> category = "NEET UG"
+                    - NEET PG -> category = "NEET PG"
 
-                    For real estate:
-                    - category can be residential or commercial.
+                    For loan:
+                    - Extract only the loan type.
+                    - Example: "I need personal loan leads" -> category = "Personal Loan"
+                    - Example: "I need home loan leads" -> category = "Home Loan"
+                    - Example: "I need business loan leads" -> category = "Business Loan"
+                    - Do not put the full user message in category.
 
-                    If a piece of information is not provided, use null.
+                    For real_estate:
+                    - Residential property -> category = "Residential"
+                    - Commercial property -> category = "Commercial"
+
+                    For communication:
+                    - If the user mentions "Bulk SMS", category MUST be "Bulk SMS".
+                    - If the user mentions "RCS" or "RCS SMS", category MUST be "RCS SMS".
+                    - If the user mentions "Voice", "Voice OBD", or "Voice OBD/IBD", category MUST be "Voice OBD/IBD".
+                    - If the user mentions "WhatsApp", category MUST be "WhatsApp".
+                    - If the user mentions "IVR", category MUST be "IVR".
+                    - If the user mentions "Toll-Free" or "Toll Free", category MUST be "Toll-Free".
+
+                    LOCATION RULE:
+                    - Extract only the location name.
+                    - If no location is given, use null.
+
+                    QUANTITY RULE:
+                    - Extract the requested number of leads or recipients.
+                    - If no quantity is given, use null.
+
+                    If any information is not provided, use null.
+                    Do not invent missing information.
+                    Do not copy the entire user message into a field.
 
                     Return ONLY valid JSON.
+                    Do not use Markdown.
+                    Do not use ```json code blocks.
                     Do not explain anything.
+
+                    Example:
+
+                    User: I need personal loan leads in Delhi for 5000 people.
+
+                    Output:
+                    {
+                    "intent": "loan",
+                    "category": "Personal Loan",
+                    "location": "Delhi",
+                    "quantity": 5000
+                    }
+
+                    User: I want to send Bulk SMS to 50000 customers.
+
+                    Output:
+                    {
+                    "intent": "communication",
+                    "category": "Bulk SMS",
+                    "location": null,
+                    "quantity": 50000
+                    }
                     """
             },
             {
@@ -247,7 +342,7 @@ def extract_information(user_input):
     return data
 
 
-
+#main chatbot loop
 print("Hello! I am your chatbot.")
 
 while True:
@@ -264,18 +359,16 @@ while True:
     if intent == "education":
         lead = education_agent(data)
         print(lead)
-
     elif intent == "loan":
-        loan_agent()
-
+        lead = loan_agent(data)
+        print(lead)
     elif intent == "real_estate":
-        real_estate_agent()
-
+        lead = real_estate_agent(data)
+        print(lead)
     elif intent == "communication":
-        communication_agent()
-
+        lead = communication_agent(data)
+        print(lead)
     elif "hello" in user_input or "hi" in user_input:
         print("Hello! How can I help you today?")
-
     else:
         print("Sorry, I don't understand your request yet.") 
