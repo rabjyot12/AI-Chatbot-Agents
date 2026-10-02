@@ -32,7 +32,6 @@ def get_connection():
 
 
 def create_table():
-
     connection = get_connection()
     cursor = connection.cursor()
 
@@ -47,8 +46,21 @@ def create_table():
         );
     """)
 
-    connection.commit()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS onboarding (
+            id SERIAL PRIMARY KEY,
+            company_email VARCHAR(255),
+            gst_status VARCHAR(30) DEFAULT 'pending',
+            pan_status VARCHAR(30) DEFAULT 'pending',
+            aadhaar_status VARCHAR(30) DEFAULT 'pending',
+            msme_required BOOLEAN DEFAULT FALSE,
+            msme_status VARCHAR(30) DEFAULT 'not_required',
+            onboarding_status VARCHAR(30) DEFAULT 'incomplete',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
 
+    connection.commit()
     cursor.close()
     connection.close()
 
@@ -107,3 +119,65 @@ def get_all_leads():
     connection.close()
 
     return leads
+
+
+def save_onboarding(onboarding):
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        INSERT INTO onboarding (
+            company_email,
+            gst_status,
+            pan_status,
+            aadhaar_status,
+            msme_required,
+            msme_status,
+            onboarding_status
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        RETURNING id;
+    """, (
+        onboarding["company_email"],
+        onboarding["gst_status"],
+        onboarding["pan_status"],
+        onboarding["aadhaar_status"],
+        onboarding["msme_required"],
+        onboarding["msme_status"],
+        onboarding["onboarding_status"]
+    ))
+
+    onboarding_id = cursor.fetchone()[0]
+
+    connection.commit()
+    cursor.close()
+    connection.close()
+
+    return onboarding_id
+
+
+def get_all_onboarding():
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        SELECT
+            id,
+            company_email,
+            gst_status,
+            pan_status,
+            aadhaar_status,
+            msme_required,
+            msme_status,
+            onboarding_status,
+            created_at
+        FROM onboarding
+        ORDER BY created_at DESC;
+    """)
+
+    onboarding_records = cursor.fetchall()
+
+    cursor.close()
+    connection.close()
+
+    return onboarding_records

@@ -158,12 +158,24 @@ def communication_agent(data):
 
 
 
-#intent detection function
+#uses keywords to identify the request
 
 
 def detect_intent(user_input):
 
-    if "education" in user_input or "neet" in user_input:
+    user_input = user_input.lower()
+
+    if (
+        "onboard" in user_input
+        or "onboarding" in user_input
+        or "registration" in user_input
+        or "register" in user_input
+        or "setup" in user_input
+        or "set up" in user_input
+    ):
+        return "onboarding"
+
+    elif "education" in user_input or "neet" in user_input:
         return "education"
 
     elif "loan" in user_input:
@@ -187,6 +199,7 @@ def detect_intent(user_input):
         return "unknown"
 
 
+#uses the LLM to identify the request
 def detect_intent_with_llm(user_input):
     response = client.chat.completions.create(
         model="openai/gpt-oss-20b",
@@ -220,7 +233,7 @@ def detect_intent_with_llm(user_input):
     return intent
 
 
-
+#stores the user's answer in the correct field
 def update_followup_data(user_input, current_data, missing):
 
     value = user_input.strip()
@@ -294,7 +307,60 @@ def update_followup_data(user_input, current_data, missing):
     return True
 
 
+# onboarding agent
+def onboarding_agent(data):
 
+    if data.get("company_email") is None:
+        return {
+            "status": "incomplete",
+            "missing": "company_email",
+            "data": data
+        }
+
+    if data.get("gst_status") != "received":
+        return {
+            "status": "incomplete",
+            "missing": "gst_status",
+            "data": data
+        }
+
+    if data.get("pan_status") != "received":
+        return {
+            "status": "incomplete",
+            "missing": "pan_status",
+            "data": data
+        }
+
+    if data.get("aadhaar_status") != "received":
+        return {
+            "status": "incomplete",
+            "missing": "aadhaar_status",
+            "data": data
+        }
+
+    if data.get("msme_required") is None:
+        return {
+            "status": "incomplete",
+            "missing": "msme_decision",
+            "data": data
+        }
+
+    if (
+        data.get("msme_required") is True
+        and data.get("msme_status") != "received"
+    ):
+        return {
+            "status": "incomplete",
+            "missing": "msme",
+            "data": data
+        }
+
+    return {
+        "status": "complete",
+        "data": data
+    }
+
+#this converts user's language to structured data using the LLM
 def extract_information(user_input, conversation_history, current_data=None):
 
     try:
@@ -318,6 +384,7 @@ def extract_information(user_input, conversation_history, current_data=None):
                             loan
                             real_estate
                             communication
+                            onboarding
                             unknown
         
                             CATEGORY RULES:
@@ -344,7 +411,10 @@ def extract_information(user_input, conversation_history, current_data=None):
                             - If the user mentions "WhatsApp", category MUST be "WhatsApp".
                             - If the user mentions "IVR", category MUST be "IVR".
                             - If the user mentions "Toll-Free" or "Toll Free", category MUST be "Toll-Free".
-        
+
+                            For onboarding:
+                            - If the user says they want to onboard, register, activate, or set up the services, use intent = "onboarding".
+
                             LOCATION RULE:
                             - Extract only the location name.
                             - If no location is given, use null.
@@ -464,6 +534,8 @@ def extract_information(user_input, conversation_history, current_data=None):
     return data
 
 
+
+#Controls the whole conversation
 def process_message(user_input, current_intent, current_data, conversation_history):
 
     conversation_history.append({
@@ -471,40 +543,58 @@ def process_message(user_input, current_intent, current_data, conversation_histo
         "content": user_input
     })
 
-    # --------------------------------------------------
-    # NEW REQUEST
-    # --------------------------------------------------
+    #new request
 
     if current_intent is None:
 
-        data = extract_information(
-            user_input,
-            conversation_history,
-            None
-        )
+        detected_intent = detect_intent(user_input)
 
-        intent = data["intent"]
+        if detected_intent == "onboarding":
 
-        if intent == "unknown":
-            return {
-                "reply": "Sorry, I don't understand your request yet.",
-                "current_intent": None,
-                "current_data": None,
-                "conversation_history": conversation_history,
-                "complete": False,
-                "lead": None
+            current_intent = "onboarding"
+
+            current_data = {
+                "intent": "onboarding",
+                "company_email": None,
+                "gst_status": "pending",
+                "pan_status": "pending",
+                "aadhaar_status": "pending",
+                "msme_required": None,
+                "msme_status": "not_required",
+                "onboarding_status": "incomplete"
             }
 
-        current_intent = intent
-        current_data = data
+        else:
 
-    # --------------------------------------------------
-    # EXISTING REQUEST / FOLLOW-UP
-    # --------------------------------------------------
+            data = extract_information(
+                user_input,
+                conversation_history,
+                None
+            )
+
+            intent = data["intent"]
+
+            if intent == "unknown":
+                return {
+                    "reply": "Sorry, I don't understand your request yet.",
+                    "current_intent": None,
+                    "current_data": None,
+                    "conversation_history": conversation_history,
+                    "complete": False,
+                    "lead": None
+                }
+
+            current_intent = intent
+            current_data = data
+
+        
+
+    #follow-up message for an existing request
+   
 
     else:
 
-        # Check which field is currently missing
+        # check which field is currently missing
 
         if current_intent == "education":
             result = education_agent(current_data)
@@ -518,6 +608,9 @@ def process_message(user_input, current_intent, current_data, conversation_histo
         elif current_intent == "communication":
             result = communication_agent(current_data)
 
+        elif current_intent == "onboarding":
+            result = onboarding_agent(current_data)
+
         else:
             result = {
                 "status": "incomplete",
@@ -527,8 +620,8 @@ def process_message(user_input, current_intent, current_data, conversation_histo
 
         missing = result["missing"]
 
-        # Try to understand whether the user started
-        # a completely new request.
+        # try to understand whether the user started
+        #a completely new request.
 
         detected_intent = detect_intent(user_input)
 
@@ -549,14 +642,93 @@ def process_message(user_input, current_intent, current_data, conversation_histo
 
         else:
 
-            # Treat the message as an answer to the
-            # currently missing field.
+            if current_intent == "onboarding":
 
-            updated = update_followup_data(
-                user_input,
-                current_data,
-                missing
-            )
+                if missing == "company_email":
+
+                    email = user_input.strip()
+
+                    if "@" in email and "." in email.split("@")[-1]:
+
+                        current_data["company_email"] = email
+                        updated = True
+
+                    else:
+
+                        return {
+                            "reply": (
+                                "Please provide a valid company email address "
+                                "linked to your website domain."
+                            ),
+                            "current_intent": current_intent,
+                            "current_data": current_data,
+                            "conversation_history": conversation_history,
+                            "complete": False,
+                            "lead": None,
+                            "onboarding": True
+                        }
+
+                elif missing == "msme_decision":
+
+                    answer = user_input.strip().lower()
+
+                    if answer in ["yes", "y"]:
+
+                        current_data["msme_required"] = True
+                        current_data["msme_status"] = "pending"
+
+                        updated = True
+
+                    elif answer in ["no", "n"]:
+
+                        current_data["msme_required"] = False
+                        current_data["msme_status"] = "not_required"
+
+                        updated = True
+
+                    else:
+
+                        return {
+                            "reply": (
+                                "Please answer Yes or No.\n\n"
+                                "Will you be using your company name as the sender ID?"
+                            ),
+                            "current_intent": current_intent,
+                            "current_data": current_data,
+                            "conversation_history": conversation_history,
+                            "complete": False,
+                            "lead": None,
+                            "onboarding": True
+                        }
+
+                elif missing == "msme":
+
+                    # MSME is already required.
+                    # The user cannot answer this step with Yes/No.
+                    return {
+                        "reply": (
+                            "Please upload your MSME Registration certificate "
+                            "using the upload option below."
+                        ),
+                        "current_intent": current_intent,
+                        "current_data": current_data,
+                        "conversation_history": conversation_history,
+                        "complete": False,
+                        "lead": None,
+                        "onboarding": True
+                    }
+
+                else:
+
+                    updated = True
+
+            else:
+
+                updated = update_followup_data(
+                    user_input,
+                    current_data,
+                    missing
+                )
 
             if not updated:
                 return {
@@ -568,9 +740,8 @@ def process_message(user_input, current_intent, current_data, conversation_histo
                     "lead": None
                 }
 
-    # --------------------------------------------------
-    # RUN THE APPROPRIATE AGENT
-    # --------------------------------------------------
+    #run the appropriate agent function based on the current intent
+
 
     if current_intent == "education":
 
@@ -588,6 +759,9 @@ def process_message(user_input, current_intent, current_data, conversation_histo
 
         result = communication_agent(current_data)
 
+    elif current_intent == "onboarding":
+        result = onboarding_agent(current_data)
+
     else:
 
         return {
@@ -599,13 +773,61 @@ def process_message(user_input, current_intent, current_data, conversation_histo
             "lead": None
         }
 
-    # --------------------------------------------------
-    # REQUEST IS STILL INCOMPLETE
-    # --------------------------------------------------
+
+    # request is still incomplete, ask for the missing information
+
 
     if result["status"] == "incomplete":
 
         missing = result["missing"]
+
+        if current_intent == "onboarding":
+
+            if missing == "company_email":
+                reply = (
+                    "Please provide a valid email address linked "
+                    "to your company's website domain."
+                )
+
+            elif missing == "gst_status":
+                reply = (
+                    "Please upload your GST Certificate "
+                    "using the upload option below."
+                )
+
+            elif missing == "pan_status":
+                reply = (
+                    "Please upload your PAN Card "
+                    "using the upload option below."
+                )
+
+            elif missing == "aadhaar_status":
+                reply = (
+                    "Please upload your Aadhaar Card "
+                    "using the upload option below."
+                )
+
+            elif missing == "msme_decision":
+                reply = (
+                    "Will you be using your company name as the sender ID?\n\n"
+                    "Please answer Yes or No."
+                )
+
+            elif missing == "msme":
+                reply = (
+                    "Please upload your MSME Registration certificate "
+                    "using the upload option below."
+                )
+
+            return {
+                "reply": reply,
+                "current_intent": current_intent,
+                "current_data": current_data,
+                "conversation_history": conversation_history,
+                "complete": False,
+                "lead": None,
+                "onboarding": True
+            }
 
         if current_intent == "education":
 
@@ -666,9 +888,33 @@ def process_message(user_input, current_intent, current_data, conversation_histo
             "lead": None
         }
 
-    # --------------------------------------------------
-    # REQUEST IS COMPLETE
-    # --------------------------------------------------
+
+    if current_intent == "onboarding":
+
+        current_data["onboarding_status"] = "complete"
+
+        return {
+            "reply": (
+                "Great! Your onboarding information has been collected successfully.\n\n"
+                "Company Email: "
+                f"{current_data['company_email']}\n"
+                "GST Certificate: Received\n"
+                "PAN Card: Received\n"
+                "Aadhaar Card: Received\n"
+                f"MSME Registration: {current_data['msme_status']}"
+            ),
+            "current_intent": None,
+            "current_data": None,
+            "conversation_history": conversation_history,
+            "complete": True,
+            "lead": None,
+            "onboarding": True,
+            "onboarding_data": current_data
+        }
+
+
+    #request is complete, save the lead and return a summary
+
 
     lead = result["data"]
 
