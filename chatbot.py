@@ -5,10 +5,10 @@ from openai import OpenAI
 
 load_dotenv()
 
-api_key = os.getenv("OPENROUTER_API_KEY")
+api_key = os.getenv("GROQ_API_KEY")
 
 client = OpenAI(
-    base_url="https://openrouter.ai/api/v1",
+    base_url="https://api.groq.com/openai/v1",
     api_key=api_key
 )
 
@@ -189,7 +189,7 @@ def detect_intent(user_input):
 
 def detect_intent_with_llm(user_input):
     response = client.chat.completions.create(
-        model="openrouter/free",
+        model="openai/gpt-oss-20b",
         messages=[
             {
                 "role": "system",
@@ -221,134 +221,219 @@ def detect_intent_with_llm(user_input):
 
 
 
+def update_followup_data(user_input, current_data, missing):
+
+    value = user_input.strip()
+
+    if missing == "quantity":
+        try:
+            quantity = int(value.replace(",", ""))
+            current_data["quantity"] = quantity
+        except ValueError:
+            return False
+
+    elif missing == "location":
+        current_data["location"] = value.title()
+
+    elif missing == "category":
+
+        intent = current_data["intent"]
+
+        if intent == "loan":
+            current_data["category"] = value.title()
+
+        elif intent == "education":
+            value_lower = value.lower()
+
+            if "neet ug" in value_lower:
+                current_data["category"] = "NEET UG"
+
+            elif "neet pg" in value_lower:
+                current_data["category"] = "NEET PG"
+
+            else:
+                return False
+
+        elif intent == "real_estate":
+            value_lower = value.lower()
+
+            if "residential" in value_lower:
+                current_data["category"] = "Residential"
+
+            elif "commercial" in value_lower:
+                current_data["category"] = "Commercial"
+
+            else:
+                return False
+
+        elif intent == "communication":
+
+            value_lower = value.lower()
+
+            if "bulk sms" in value_lower:
+                current_data["category"] = "Bulk SMS"
+
+            elif "rcs" in value_lower:
+                current_data["category"] = "RCS SMS"
+
+            elif "voice" in value_lower:
+                current_data["category"] = "Voice OBD/IBD"
+
+            elif "whatsapp" in value_lower:
+                current_data["category"] = "WhatsApp"
+
+            elif "ivr" in value_lower:
+                current_data["category"] = "IVR"
+
+            elif "toll" in value_lower:
+                current_data["category"] = "Toll-Free"
+
+            else:
+                return False
+
+    return True
+
+
+
 def extract_information(user_input, conversation_history, current_data=None):
 
-    response = client.chat.completions.create(
-        model="openrouter/free",
-        messages=[
-            {
-                "role": "system",
-                "content": """
-                    You are a data extraction system for a business chatbot.
-
-                    Extract exactly these fields from the user's message:
-
-                    1. intent
-                    2. category
-                    3. location
-                    4. quantity
-
-                    The intent must be exactly one of:
-                    education
-                    loan
-                    real_estate
-                    communication
-                    unknown
-
-                    CATEGORY RULES:
-
-                    For education:
-                    - NEET UG -> category = "NEET UG"
-                    - NEET PG -> category = "NEET PG"
-
-                    For loan:
-                    - Extract only the loan type.
-                    - Example: "I need personal loan leads" -> category = "Personal Loan"
-                    - Example: "I need home loan leads" -> category = "Home Loan"
-                    - Example: "I need business loan leads" -> category = "Business Loan"
-                    - Do not put the full user message in category.
-
-                    For real_estate:
-                    - Residential property -> category = "Residential"
-                    - Commercial property -> category = "Commercial"
-
-                    For communication:
-                    - If the user mentions "Bulk SMS", category MUST be "Bulk SMS".
-                    - If the user mentions "RCS" or "RCS SMS", category MUST be "RCS SMS".
-                    - If the user mentions "Voice", "Voice OBD", or "Voice OBD/IBD", category MUST be "Voice OBD/IBD".
-                    - If the user mentions "WhatsApp", category MUST be "WhatsApp".
-                    - If the user mentions "IVR", category MUST be "IVR".
-                    - If the user mentions "Toll-Free" or "Toll Free", category MUST be "Toll-Free".
-
-                    LOCATION RULE:
-                    - Extract only the location name.
-                    - If no location is given, use null.
-
-                    QUANTITY RULE:
-                    - Extract the requested number of leads or recipients.
-                    - If no quantity is given, use null.
-
-                    If any information is not provided, use null.
-                    If the latest message is a new request, do not copy missing values from an older completed request.
-                    Only use previous information when it belongs to the current unfinished request.
-
-                    For example:
-
-                    Previous message:
-                    "I need loan leads."
-
-                    Latest message:
-                    "Personal Loan"
-
-                    The result should be:
-
+    try:
+        response = client.chat.completions.create(
+                model="openai/gpt-oss-20b",
+                messages=[
                     {
-                        "intent": "loan",
-                        "category": "Personal Loan",
-                        "location": null,
-                        "quantity": null
-                    }
-                    Do not invent missing information.
-                    Do not copy the entire user message into a field.
-
-                    Return ONLY valid JSON.
-                    Do not use Markdown.
-                    Do not use ```json code blocks.
-                    Do not explain anything.
-
-                    Example:
-
-                    User: I need personal loan leads in Delhi for 5000 people.
-
-                    Output:
+                        "role": "system",
+                        "content": """
+                            You are a data extraction system for a business chatbot.
+        
+                            Extract exactly these fields from the user's message:
+        
+                            1. intent
+                            2. category
+                            3. location
+                            4. quantity
+        
+                            The intent must be exactly one of:
+                            education
+                            loan
+                            real_estate
+                            communication
+                            unknown
+        
+                            CATEGORY RULES:
+        
+                            For education:
+                            - NEET UG -> category = "NEET UG"
+                            - NEET PG -> category = "NEET PG"
+        
+                            For loan:
+                            - Extract only the loan type.
+                            - Example: "I need personal loan leads" -> category = "Personal Loan"
+                            - Example: "I need home loan leads" -> category = "Home Loan"
+                            - Example: "I need business loan leads" -> category = "Business Loan"
+                            - Do not put the full user message in category.
+        
+                            For real_estate:
+                            - Residential property -> category = "Residential"
+                            - Commercial property -> category = "Commercial"
+        
+                            For communication:
+                            - If the user mentions "Bulk SMS", category MUST be "Bulk SMS".
+                            - If the user mentions "RCS" or "RCS SMS", category MUST be "RCS SMS".
+                            - If the user mentions "Voice", "Voice OBD", or "Voice OBD/IBD", category MUST be "Voice OBD/IBD".
+                            - If the user mentions "WhatsApp", category MUST be "WhatsApp".
+                            - If the user mentions "IVR", category MUST be "IVR".
+                            - If the user mentions "Toll-Free" or "Toll Free", category MUST be "Toll-Free".
+        
+                            LOCATION RULE:
+                            - Extract only the location name.
+                            - If no location is given, use null.
+        
+                            QUANTITY RULE:
+                            - Extract the requested number of leads or recipients.
+                            - If no quantity is given, use null.
+        
+                            If any information is not provided, use null.
+                            If the latest message is a new request, do not copy missing values from an older completed request.
+                            Only use previous information when it belongs to the current unfinished request.
+        
+                            For example:
+        
+                            Previous message:
+                            "I need loan leads."
+        
+                            Latest message:
+                            "Personal Loan"
+        
+                            The result should be:
+        
+                            {
+                                "intent": "loan",
+                                "category": "Personal Loan",
+                                "location": null,
+                                "quantity": null
+                            }
+                            Do not invent missing information.
+                            Do not copy the entire user message into a field.
+        
+                            Return ONLY valid JSON.
+                            Do not use Markdown.
+                            Do not use ```json code blocks.
+                            Do not explain anything.
+        
+                            Example:
+        
+                            User: I need personal loan leads in Delhi for 5000 people.
+        
+                            Output:
+                            {
+                            "intent": "loan",
+                            "category": "Personal Loan",
+                            "location": "Delhi",
+                            "quantity": 5000
+                            }
+        
+                            User: I want to send Bulk SMS to 50000 customers.
+        
+                            Output:
+                            {
+                            "intent": "communication",
+                            "category": "Bulk SMS",
+                            "location": null,
+                            "quantity": 50000
+                            }
+                            """
+                    },
                     {
-                    "intent": "loan",
-                    "category": "Personal Loan",
-                    "location": "Delhi",
-                    "quantity": 5000
+                        "role": "user",
+                        "content": f"""
+                            Current request information:
+                            {current_data}
+        
+                            Latest user message:
+                            {user_input}
+        
+                            Extract information from the latest user message.
+        
+                            If Current request information contains already collected fields, keep those fields.
+        
+                            Do NOT copy values from older completed requests in the conversation history.
+        
+                            If a field has not been provided for the current request, return null.
+                            """
                     }
+                ]
+            )
 
-                    User: I want to send Bulk SMS to 50000 customers.
+    except Exception as e:
+        print("LLM API error:", e)
 
-                    Output:
-                    {
-                    "intent": "communication",
-                    "category": "Bulk SMS",
-                    "location": null,
-                    "quantity": 50000
-                    }
-                    """
-            },
-            {
-                "role": "user",
-                "content": f"""
-                    Current request information:
-                    {current_data}
-
-                    Latest user message:
-                    {user_input}
-
-                    Extract information from the latest user message.
-
-                    If Current request information contains already collected fields, keep those fields.
-
-                    Do NOT copy values from older completed requests in the conversation history.
-
-                    If a field has not been provided for the current request, return null.
-                    """
-            }
-        ]
-    )
+        return {
+            "intent": "unknown",
+            "category": None,
+            "location": None,
+            "quantity": None
+        }
 
     result = response.choices[0].message.content
 
@@ -379,152 +464,257 @@ def extract_information(user_input, conversation_history, current_data=None):
     return data
 
 
-#main chatbot loop
-print("Hello! I am your chatbot.")
-
-conversation_history = []
-current_intent = None
-current_data = None
-while True:
-
-    user_input = input("You: ")
-
-    if "bye" in user_input.lower():
-        print("Goodbye!")
-        break
+def process_message(user_input, current_intent, current_data, conversation_history):
 
     conversation_history.append({
         "role": "user",
         "content": user_input
     })
 
-    data = extract_information(
-        user_input,
-        conversation_history,
-        current_data
-    )
-
-    detected_intent = data["intent"]
+    # --------------------------------------------------
+    # NEW REQUEST
+    # --------------------------------------------------
 
     if current_intent is None:
 
-        if detected_intent == "unknown":
-            print("Sorry, I don't understand your request yet.")
-            continue
+        data = extract_information(
+            user_input,
+            conversation_history,
+            None
+        )
 
-        current_intent = detected_intent
+        intent = data["intent"]
+
+        if intent == "unknown":
+            return {
+                "reply": "Sorry, I don't understand your request yet.",
+                "current_intent": None,
+                "current_data": None,
+                "conversation_history": conversation_history,
+                "complete": False,
+                "lead": None
+            }
+
+        current_intent = intent
         current_data = data
+
+    # --------------------------------------------------
+    # EXISTING REQUEST / FOLLOW-UP
+    # --------------------------------------------------
 
     else:
 
-        if detected_intent != current_intent and detected_intent != "unknown":
+        # Check which field is currently missing
 
-            current_intent = detected_intent
-            current_data = data
+        if current_intent == "education":
+            result = education_agent(current_data)
+
+        elif current_intent == "loan":
+            result = loan_agent(current_data)
+
+        elif current_intent == "real_estate":
+            result = real_estate_agent(current_data)
+
+        elif current_intent == "communication":
+            result = communication_agent(current_data)
+
+        else:
+            result = {
+                "status": "incomplete",
+                "missing": None,
+                "data": current_data
+            }
+
+        missing = result["missing"]
+
+        # Try to understand whether the user started
+        # a completely new request.
+
+        detected_intent = detect_intent(user_input)
+
+        if (
+            detected_intent != "unknown"
+            and detected_intent != current_intent
+        ):
+
+            data = extract_information(
+                user_input,
+                conversation_history,
+                None
+            )
+
+            if data["intent"] != "unknown":
+                current_intent = data["intent"]
+                current_data = data
 
         else:
 
-            current_data.update({
-                key: value
-                for key, value in data.items()
-                if value is not None
-            })
+            # Treat the message as an answer to the
+            # currently missing field.
 
-    intent = current_intent
-    data = current_data
+            updated = update_followup_data(
+                user_input,
+                current_data,
+                missing
+            )
 
-    if intent == "education":
-        result = education_agent(data)
+            if not updated:
+                return {
+                    "reply": f"I couldn't understand that. Please provide the {missing}.",
+                    "current_intent": current_intent,
+                    "current_data": current_data,
+                    "conversation_history": conversation_history,
+                    "complete": False,
+                    "lead": None
+                }
 
-    elif intent == "loan":
-        result = loan_agent(data)
+    # --------------------------------------------------
+    # RUN THE APPROPRIATE AGENT
+    # --------------------------------------------------
 
-    elif intent == "real_estate":
-        result = real_estate_agent(data)
+    if current_intent == "education":
 
-    elif intent == "communication":
-        result = communication_agent(data)
+        result = education_agent(current_data)
+
+    elif current_intent == "loan":
+
+        result = loan_agent(current_data)
+
+    elif current_intent == "real_estate":
+
+        result = real_estate_agent(current_data)
+
+    elif current_intent == "communication":
+
+        result = communication_agent(current_data)
 
     else:
-        print("Sorry, I don't understand your request yet.")
-        continue
+
+        return {
+            "reply": "Sorry, I don't understand your request yet.",
+            "current_intent": None,
+            "current_data": None,
+            "conversation_history": conversation_history,
+            "complete": False,
+            "lead": None
+        }
+
+    # --------------------------------------------------
+    # REQUEST IS STILL INCOMPLETE
+    # --------------------------------------------------
 
     if result["status"] == "incomplete":
 
         missing = result["missing"]
 
-        if intent == "education":
+        if current_intent == "education":
 
             if missing == "category":
-                print("Are you looking for NEET UG or NEET PG leads?")
+                reply = "Are you looking for NEET UG or NEET PG leads?"
 
             elif missing == "location":
-                print("Which location are you looking for?")
+                reply = "Which location are you looking for?"
 
             elif missing == "quantity":
-                print("How many leads do you need?")
+                reply = "How many leads do you need?"
 
-        elif intent == "loan":
+        elif current_intent == "loan":
 
             if missing == "category":
-                print("What type of loan leads are you looking for?")
+                reply = "What type of loan leads are you looking for?"
 
             elif missing == "location":
-                print("Which location are you looking for?")
+                reply = "Which location are you looking for?"
 
             elif missing == "quantity":
-                print("How many leads do you need?")
+                reply = "How many leads do you need?"
 
-        elif intent == "real_estate":
+        elif current_intent == "real_estate":
 
             if missing == "category":
-                print("Are you looking for residential or commercial real estate leads?")
+                reply = (
+                    "Are you looking for residential or "
+                    "commercial real estate leads?"
+                )
 
             elif missing == "location":
-                print("Which location are you interested in?")
+                reply = "Which location are you interested in?"
 
             elif missing == "quantity":
-                print("How many leads do you need?")
+                reply = "How many leads do you need?"
 
-        elif intent == "communication":
+        elif current_intent == "communication":
 
             if missing == "category":
-                print("Which communication service are you interested in?")
-                print("Bulk SMS, RCS SMS, Voice, WhatsApp, IVR, or Toll-Free?")
+                reply = (
+                    "Which communication service are you interested in?\n\n"
+                    "Bulk SMS, RCS SMS, Voice, WhatsApp, IVR, or Toll-Free?"
+                )
 
             elif missing == "quantity":
-                print("What is the approximate number of customers/recipients?")
+                reply = (
+                    "What is the approximate number of "
+                    "customers/recipients?"
+                )
 
-    else:
+        return {
+            "reply": reply,
+            "current_intent": current_intent,
+            "current_data": current_data,
+            "conversation_history": conversation_history,
+            "complete": False,
+            "lead": None
+        }
 
-        lead = result["data"]
+    # --------------------------------------------------
+    # REQUEST IS COMPLETE
+    # --------------------------------------------------
 
-        print("\nHere is the information I collected:")
+    lead = result["data"]
 
-        if intent == "education":
-            print("Service:", "Education Data")
-            print("Category:", lead["category"])
-            print("Location:", lead["location"])
-            print("Lead Quantity:", lead["quantity"])
+    if current_intent == "education":
 
-        elif intent == "loan":
-            print("Service:", "Loan Data")
-            print("Loan Type:", lead["category"])
-            print("Location:", lead["location"])
-            print("Lead Quantity:", lead["quantity"])
+        reply = (
+            "Great! I have collected your requirements.\n\n"
+            f"Service: Education Data\n"
+            f"Category: {lead['category']}\n"
+            f"Location: {lead['location']}\n"
+            f"Lead Quantity: {lead['quantity']}"
+        )
 
-        elif intent == "real_estate":
-            print("Service:", "Real Estate Data")
-            print("Property Type:", lead["category"])
-            print("Location:", lead["location"])
-            print("Lead Quantity:", lead["quantity"])
+    elif current_intent == "loan":
 
-        elif intent == "communication":
-            print("Service:", lead["category"])
-            print("Recipient Quantity:", lead["quantity"])
+        reply = (
+            "Great! I have collected your requirements.\n\n"
+            f"Service: Loan Data\n"
+            f"Loan Type: {lead['category']}\n"
+            f"Location: {lead['location']}\n"
+            f"Lead Quantity: {lead['quantity']}"
+        )
 
-        print("\nStructured Lead Data:")
-        print(lead) 
+    elif current_intent == "real_estate":
 
-        current_intent = None
-        current_data = None
+        reply = (
+            "Great! I have collected your requirements.\n\n"
+            f"Service: Real Estate Data\n"
+            f"Property Type: {lead['category']}\n"
+            f"Location: {lead['location']}\n"
+            f"Lead Quantity: {lead['quantity']}"
+        )
+
+    elif current_intent == "communication":
+
+        reply = (
+            "Great! I have collected your requirements.\n\n"
+            f"Service: {lead['category']}\n"
+            f"Recipient Quantity: {lead['quantity']}"
+        )
+
+    return {
+        "reply": reply,
+        "current_intent": None,
+        "current_data": None,
+        "conversation_history": conversation_history,
+        "complete": True,
+        "lead": lead
+    }
