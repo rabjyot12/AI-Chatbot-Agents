@@ -325,4 +325,4 @@ if user_input:
                 "The lead was collected, but it could not be saved to the database."
             )
 
-            print("Database error:", e)
+            print(f"Database error: {e}")
