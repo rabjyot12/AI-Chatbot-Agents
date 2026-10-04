@@ -3,9 +3,7 @@ import os
 import psycopg2
 from dotenv import load_dotenv
 
-
 load_dotenv()
-
 
 try:
     import streamlit as st
@@ -14,7 +12,6 @@ try:
         secrets = st.secrets
     else:
         secrets = {}
-
 except Exception:
     secrets = {}
 
@@ -23,7 +20,7 @@ DB_CONFIG = {
     "database": secrets.get("DB_NAME", os.getenv("DB_NAME", "ai_chatbot")),
     "user": secrets.get("DB_USER", os.getenv("DB_USER", "postgres")),
     "password": secrets.get("DB_PASSWORD", os.getenv("DB_PASSWORD")),
-    "port": secrets.get("DB_PORT", os.getenv("DB_PORT", "5432"))
+    "port": secrets.get("DB_PORT", os.getenv("DB_PORT", "5432")),
 }
 
 
@@ -60,68 +57,55 @@ def create_table():
         );
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS sales_prospects (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(150),
+            company VARCHAR(200),
+            phone VARCHAR(50),
+            email VARCHAR(255),
+            requirement TEXT,
+            interested_product VARCHAR(100),
+            expected_scale VARCHAR(100),
+            sales_followup BOOLEAN DEFAULT FALSE,
+            channel VARCHAR(30) DEFAULT 'website',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+
     connection.commit()
     cursor.close()
     connection.close()
 
 
 def save_lead(lead):
+    connection = get_connection()
+    cursor = connection.cursor()
 
-    connection = None
-    cursor = None
+    cursor.execute("""
+        INSERT INTO leads (
+            intent,
+            category,
+            location,
+            quantity
+        )
+        VALUES (%s, %s, %s, %s)
+        RETURNING id;
+    """, (
+        lead["intent"],
+        lead["category"],
+        lead["location"],
+        lead["quantity"],
+    ))
 
-    try:
-
-        connection = get_connection()
-        cursor = connection.cursor()
-
-        print("LEAD BEING SAVED:")
-        print(lead)
-
-        cursor.execute("""
-            INSERT INTO leads (
-                intent,
-                category,
-                location,
-                quantity
-            )
-            VALUES (%s, %s, %s, %s)
-            RETURNING id;
-        """, (
-            lead["intent"],
-            lead["category"],
-            lead["location"],
-            lead["quantity"]
-        ))
-
-        lead_id = cursor.fetchone()[0]
-
-        connection.commit()
-
-        return lead_id
-
-    except Exception as e:
-
-        if connection:
-            connection.rollback()
-
-        print("DATABASE ERROR:")
-        print(type(e).__name__)
-        print(str(e))
-
-        raise e
-
-    finally:
-
-        if cursor:
-            cursor.close()
-
-        if connection:
-            connection.close()
+    lead_id = cursor.fetchone()[0]
+    connection.commit()
+    cursor.close()
+    connection.close()
+    return lead_id
 
 
 def get_all_leads():
-
     connection = get_connection()
     cursor = connection.cursor()
 
@@ -138,10 +122,8 @@ def get_all_leads():
     """)
 
     leads = cursor.fetchall()
-
     cursor.close()
     connection.close()
-
     return leads
 
 
@@ -168,15 +150,13 @@ def save_onboarding(onboarding):
         onboarding["aadhaar_status"],
         onboarding["msme_required"],
         onboarding["msme_status"],
-        onboarding["onboarding_status"]
+        onboarding["onboarding_status"],
     ))
 
     onboarding_id = cursor.fetchone()[0]
-
     connection.commit()
     cursor.close()
     connection.close()
-
     return onboarding_id
 
 
@@ -200,8 +180,72 @@ def get_all_onboarding():
     """)
 
     onboarding_records = cursor.fetchall()
+    cursor.close()
+    connection.close()
+    return onboarding_records
 
+
+def save_sales_prospect(prospect, channel="website"):
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        INSERT INTO sales_prospects (
+            name,
+            company,
+            phone,
+            email,
+            requirement,
+            interested_product,
+            expected_scale,
+            sales_followup,
+            channel
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        RETURNING id;
+    """, (
+        prospect.get("name"),
+        prospect.get("company"),
+        prospect.get("phone"),
+        prospect.get("email"),
+        prospect.get("requirement"),
+        prospect.get("interested_product"),
+        prospect.get("expected_scale"),
+        prospect.get("sales_followup", False),
+        channel,
+    ))
+
+    prospect_id = cursor.fetchone()[0]
+    connection.commit()
     cursor.close()
     connection.close()
 
-    return onboarding_records
+    return prospect_id
+
+
+def get_all_sales_prospects():
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        SELECT
+            id,
+            name,
+            company,
+            phone,
+            email,
+            requirement,
+            interested_product,
+            expected_scale,
+            sales_followup,
+            channel,
+            created_at
+        FROM sales_prospects
+        ORDER BY created_at DESC;
+    """)
+
+    prospects = cursor.fetchall()
+    cursor.close()
+    connection.close()
+
+    return prospects

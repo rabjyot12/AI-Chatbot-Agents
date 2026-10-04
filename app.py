@@ -1,336 +1,331 @@
-import streamlit as st
+import os
 
-from chatbot import process_message
+import streamlit as st
+from dotenv import load_dotenv
+
 from database import (
     create_table,
-    save_lead,
-    get_all_leads,
-    save_onboarding,
-    get_all_onboarding
+    get_all_sales_prospects,
+    save_sales_prospect,
 )
+from product_catalog import PRODUCTS
+from sales_agent import process_sales_message
 
+load_dotenv()
 
 st.set_page_config(
-    page_title="AI Chatbot",
-    page_icon="🤖",
-    layout="centered"
+    page_title="Telecom AI Sales Agent",
+    page_icon="💬",
+    layout="wide",
 )
 
-create_table()
+#styling
 
-st.title("🤖 AI Chatbot")
+st.markdown(
+    """
+    <style>
+    .block-container {
+        max-width: 1100px;
+        padding-top: 2rem;
+    }
 
-st.divider()
+    .hero {
+        padding: 1.5rem 1.7rem;
+        border-radius: 18px;
+        background: linear-gradient(135deg, #0f172a, #1e3a8a);
+        color: white;
+        margin-bottom: 1.5rem;
+    }
 
-st.subheader("📊 Lead Dashboard")
+    .hero h1 {
+        margin-bottom: 0.3rem;
+    }
 
-try:
-
-    leads = get_all_leads()
-
-    if leads:
-
-        lead_data = []
-
-        for lead in leads:
-
-            lead_data.append({
-                "ID": lead[0],
-                "Intent": lead[1],
-                "Category": lead[2],
-                "Location": lead[3],
-                "Quantity": lead[4],
-                "Created At": lead[5]
-            })
-
-        st.dataframe(
-            lead_data,
-            use_container_width=True
-        )
-
-    else:
-
-        st.info("No leads have been collected yet.")
-
-except Exception as e:
-
-    st.error("Unable to load leads from the database.")
-
-    print("Dashboard database error:", e)
-
-
-st.divider()
-
-st.subheader("📋 Onboarding Dashboard")
-
-try:
-
-    onboarding_records = get_all_onboarding()
-
-    if onboarding_records:
-
-        onboarding_data = []
-
-        for record in onboarding_records:
-
-            onboarding_data.append({
-                "ID": record[0],
-                "Company Email": record[1],
-                "GST": record[2],
-                "PAN": record[3],
-                "Aadhaar": record[4],
-                "MSME Required": record[5],
-                "MSME": record[6],
-                "Status": record[7],
-                "Created At": record[8]
-            })
-
-        st.dataframe(
-            onboarding_data,
-            use_container_width=True
-        )
-
-    else:
-
-        st.info("No onboarding records yet.")
-
-except Exception as e:
-
-    st.error("Unable to load onboarding records.")
-
-    print("Onboarding dashboard error:", e)
-
-
-st.write(
-    "Tell us what service you are looking for and "
-    "I'll help collect the required information."
+    .hero p {
+        margin-bottom: 0;
+        color: #dbeafe;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
 )
 
+#database initialization
 
-#initialize session state variables
+try:
+    create_table()
+    db_ready = True
+except Exception as exc:
+    db_ready = False
+    print("Database initialization error:", exc)
 
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-if "current_intent" not in st.session_state:
-    st.session_state.current_intent = None
-
-if "current_data" not in st.session_state:
-    st.session_state.current_data = None
+#session state initialization
 
 if "conversation_history" not in st.session_state:
-    st.session_state.conversation_history = []
+    st.session_state.conversation_history = [
+        {
+            "role": "assistant",
+            "content": (
+                "Hi! 👋 I'm your telecom solutions sales assistant. "
+                "Tell me what you're trying to achieve and I'll help you find "
+                "the right communication solution."
+            ),
+        }
+    ]
 
-if "onboarding_data" not in st.session_state:
-    st.session_state.onboarding_data = None
+if "sales_state" not in st.session_state:
+    st.session_state.sales_state = {
+        "name": None,
+        "company": None,
+        "phone": None,
+        "email": None,
+        "requirement": None,
+        "interested_product": None,
+        "expected_scale": None,
+        "sales_followup": False,
+    }
 
+if "prospect_saved" not in st.session_state:
+    st.session_state.prospect_saved = False
 
-#this displays previous messages in the chat interface
+#the sidebar contains the title, description, and product information
 
-for message in st.session_state.messages:
+with st.sidebar:
+    st.title("Telecom AI Sales Agent")
 
-    with st.chat_message(message["role"]):
-        st.write(message["content"])
+    st.caption(
+        "Prototype for website sales conversations. "
+        "The same sales engine can later be connected to WhatsApp."
+    )
 
+    st.subheader("Solutions")
 
-
-#onboarding document upload section
-
-
-if st.session_state.current_intent == "onboarding":
+    for name, product in PRODUCTS.items():
+        st.markdown(f"**{name}**")
+        st.caption(product["description"])
 
     st.divider()
 
-    st.subheader("📄 Onboarding Documents")
+    if st.button("Start New Conversation", use_container_width=True):
+        st.session_state.conversation_history = [
+            {
+                "role": "assistant",
+                "content": (
+                    "Hi! 👋 I'm your telecom solutions sales assistant. "
+                    "What are you looking to achieve?"
+                ),
+            }
+        ]
 
-    current_data = st.session_state.current_data
+        st.session_state.sales_state = {
+            "name": None,
+            "company": None,
+            "phone": None,
+            "email": None,
+            "requirement": None,
+            "interested_product": None,
+            "expected_scale": None,
+            "sales_followup": False,
+        }
 
-    if current_data:
+        st.session_state.prospect_saved = False
+        st.rerun()
 
-        # GST
-        if current_data.get("gst_status") == "pending":
+#header section with title and description
 
-            gst_file = st.file_uploader(
-                "Upload GST Certificate",
-                type=["pdf", "png", "jpg", "jpeg"],
-                key="gst_upload"
-            )
+st.markdown(
+    """
+    <div class="hero">
+        <h1>💬 Telecom AI Sales Agent</h1>
+        <p>
+            Conversational sales assistant for website visitors.
+            Understand the requirement → recommend a solution → qualify the prospect → hand off to sales.
+        </p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
-            if gst_file is not None:
+chat_col, lead_col = st.columns([2.1, 1])
 
-                st.success("GST Certificate received.")
+#chat panel for conversation with the AI sales agent
 
-                current_data["gst_status"] = "received"
+with chat_col:
+    st.subheader("Conversation")
 
-        # PAN
-        if current_data.get("pan_status") == "pending":
+    for message in st.session_state.conversation_history:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
 
-            pan_file = st.file_uploader(
-                "Upload PAN Card",
-                type=["pdf", "png", "jpg", "jpeg"],
-                key="pan_upload"
-            )
+    user_input = st.chat_input("Tell me what you need...")
 
-            if pan_file is not None:
-
-                st.success("PAN Card received.")
-
-                current_data["pan_status"] = "received"
-
-        # Aadhaar
-        if current_data.get("aadhaar_status") == "pending":
-
-            aadhaar_file = st.file_uploader(
-                "Upload Aadhaar Card",
-                type=["pdf", "png", "jpg", "jpeg"],
-                key="aadhaar_upload"
-            )
-
-            if aadhaar_file is not None:
-
-                st.success("Aadhaar Card received.")
-
-                current_data["aadhaar_status"] = "received"
-
-        # MSME
-        if current_data.get("msme_required") is True:
-
-            if current_data.get("msme_status") == "pending":
-
-                msme_file = st.file_uploader(
-                    "Upload MSME Registration",
-                    type=["pdf", "png", "jpg", "jpeg"],
-                    key="msme_upload"
-                )
-
-                if msme_file is not None:
-
-                    st.success("MSME Registration received.")
-
-                    current_data["msme_status"] = "received"
-
-
-
-if st.session_state.current_intent == "onboarding":
-
-    onboarding_data = st.session_state.current_data
-
-    if onboarding_data:
-
-        required_complete = (
-            onboarding_data.get("company_email") is not None
-            and onboarding_data.get("gst_status") == "received"
-            and onboarding_data.get("pan_status") == "received"
-            and onboarding_data.get("aadhaar_status") == "received"
+    if user_input:
+        result = process_sales_message(
+            user_input,
+            st.session_state.conversation_history,
+            st.session_state.sales_state,
         )
 
-        st.write("DEBUG msme_required:", onboarding_data.get("msme_required"))
-        st.write("DEBUG type:", type(onboarding_data.get("msme_required")))
+        st.session_state.sales_state = result["state"]
 
-        msme_complete = (
-            onboarding_data.get("msme_required") is False
-            or onboarding_data.get("msme_status") == "received"
+        st.rerun()
+
+#lead panel for capturing prospect information and sending it to the sales team
+
+with lead_col:
+    st.subheader("Prospect")
+
+    state = st.session_state.sales_state
+
+    with st.form("prospect_form"):
+        name = st.text_input("Name", value=state.get("name") or "")
+        company = st.text_input("Company", value=state.get("company") or "")
+        phone = st.text_input("Phone", value=state.get("phone") or "")
+        email = st.text_input("Email", value=state.get("email") or "")
+        requirement = st.text_area(
+            "Requirement",
+            value=state.get("requirement") or "",
+        )
+        interested_product = st.text_input(
+            "Interested product",
+            value=state.get("interested_product") or "",
+        )
+        expected_scale = st.text_input(
+            "Expected scale",
+            value=state.get("expected_scale") or "",
         )
 
-        st.write("DEBUG required_complete:", required_complete)
-        st.write("DEBUG msme_complete:", msme_complete)
-        st.write("DEBUG onboarding_data:", onboarding_data)
+        save_button = st.form_submit_button(
+            "Send to Sales Team",
+            use_container_width=True,
+        )
 
-        if required_complete and msme_complete:
+    if save_button:
+        prospect = {
+            "name": name.strip() or None,
+            "company": company.strip() or None,
+            "phone": phone.strip() or None,
+            "email": email.strip() or None,
+            "requirement": requirement.strip() or None,
+            "interested_product": interested_product.strip() or None,
+            "expected_scale": expected_scale.strip() or None,
+            "sales_followup": True,
+        }
 
-            onboarding_data["onboarding_status"] = "complete"
-
+        if not any(
+            [
+                prospect["name"],
+                prospect["company"],
+                prospect["phone"],
+                prospect["email"],
+                prospect["requirement"],
+            ]
+        ):
+            st.warning("Please provide at least one useful prospect detail.")
+        elif not db_ready:
+            st.error("Database is not connected. Check the database settings.")
+        else:
             try:
-                st.write("DEBUG: Saving onboarding:", onboarding_data)
+                prospect_id = save_sales_prospect(prospect, channel="website")
 
-                onboarding_id = save_onboarding(onboarding_data)
+                st.session_state.sales_state.update(prospect)
+                st.session_state.prospect_saved = True
 
                 st.success(
-                    f"Onboarding completed successfully! "
-                    f"Onboarding ID: {onboarding_id}"
+                    f"Prospect sent to sales successfully. ID: {prospect_id}"
                 )
-
-                st.json(onboarding_data)
-
-                st.session_state.current_intent = None
-                st.session_state.current_data = None
-
-            except Exception as e:
-
+            except Exception as exc:
                 st.error(
-                    "Onboarding was completed, but the information "
-                    "could not be saved to the database."
+                    "The prospect was collected but could not be saved."
+                )
+                print("Prospect database error:", exc)
+
+    if st.session_state.prospect_saved:
+        st.info("This prospect has already been saved in the database.")
+
+#brochure section for product information and download links
+
+st.divider()
+st.subheader("Product Information")
+
+st.caption(
+    "These are prototype product descriptions. Replace them with the company's "
+    "approved brochures and product specifications before the production demo."
+)
+
+for name, product in PRODUCTS.items():
+    with st.expander(name):
+        st.write(product["description"])
+        st.write(f"**Best for:** {product['best_for']}")
+
+        st.markdown("**Known information**")
+        for fact in product["facts"]:
+            st.write(f"- {fact}")
+
+        st.download_button(
+            label=f"Download {name} information",
+            data=(
+                f"{name}\n\n"
+                f"{product['description']}\n\n"
+                f"Best for: {product['best_for']}\n\n"
+                "Known information:\n"
+                + "\n".join(f"- {fact}" for fact in product["facts"])
+            ),
+            file_name=f"{product['key']}_product_information.txt",
+            mime="text/plain",
+            key=f"download_{product['key']}",
+        )
+
+#admin/demo view
+
+st.divider()
+st.subheader("Sales Dashboard")
+
+if db_ready:
+    try:
+        prospects = get_all_sales_prospects()
+
+        st.metric("Prospects captured", len(prospects))
+
+        if prospects:
+            rows = []
+
+            for row in prospects:
+                (
+                    prospect_id,
+                    name,
+                    company,
+                    phone,
+                    email,
+                    requirement,
+                    interested_product,
+                    expected_scale,
+                    sales_followup,
+                    channel,
+                    created_at,
+                ) = row
+
+                rows.append(
+                    {
+                        "ID": prospect_id,
+                        "Name": name,
+                        "Company": company,
+                        "Phone": phone,
+                        "Email": email,
+                        "Product": interested_product,
+                        "Scale": expected_scale,
+                        "Follow-up": sales_followup,
+                        "Channel": channel,
+                        "Created": created_at,
+                    }
                 )
 
-                print("Onboarding database error:", e)
+            st.dataframe(rows, use_container_width=True)
+        else:
+            st.info("No sales prospects have been captured yet.")
 
-
-# Chat input
-
-user_input = st.chat_input("Type your message...")
-
-
-if user_input:
-
-    # Display user message
-
-    st.session_state.messages.append({
-        "role": "user",
-        "content": user_input
-    })
-
-    with st.chat_message("user"):
-        st.write(user_input)
-
-
-    # Process message
-
-    result = process_message(
-        user_input,
-        st.session_state.current_intent,
-        st.session_state.current_data,
-        st.session_state.conversation_history
-    )
-
-
-    # Update chatbot state
-
-    st.session_state.current_intent = result["current_intent"]
-    st.session_state.current_data = result["current_data"]
-    st.session_state.conversation_history = result["conversation_history"]
-
-
-    # Display chatbot response
-
-    st.session_state.messages.append({
-        "role": "assistant",
-        "content": result["reply"]
-    })
-
-    with st.chat_message("assistant"):
-        st.write(result["reply"])
-
-
-    # Show structured lead when complete
-
-    if result["complete"] and result["lead"] is not None:
-
-        st.success("Lead information collected successfully!")
-
-        st.json(result["lead"])
-
-        try:
-
-            lead_id = save_lead(result["lead"])
-
-            st.success(
-                f"Lead saved successfully! Lead ID: {lead_id}"
-            )
-
-        except Exception as e:
-
-            st.error(
-                "The lead was collected, but it could not be saved to the database."
-            )
-
-            print(f"Database error: {e}")
+    except Exception as exc:
+        st.error("Could not load the sales dashboard.")
+        print("Dashboard error:", exc)
+else:
+    st.warning("Sales dashboard is unavailable until the database connection works.")
