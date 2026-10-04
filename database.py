@@ -33,17 +33,6 @@ def create_table():
     cursor = connection.cursor()
 
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS leads (
-            id SERIAL PRIMARY KEY,
-            intent VARCHAR(50) NOT NULL,
-            category VARCHAR(100),
-            location VARCHAR(100),
-            quantity INTEGER,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-    """)
-
-    cursor.execute("""
         CREATE TABLE IF NOT EXISTS onboarding (
             id SERIAL PRIMARY KEY,
             company_email VARCHAR(255),
@@ -78,53 +67,6 @@ def create_table():
     connection.close()
 
 
-def save_lead(lead):
-    connection = get_connection()
-    cursor = connection.cursor()
-
-    cursor.execute("""
-        INSERT INTO leads (
-            intent,
-            category,
-            location,
-            quantity
-        )
-        VALUES (%s, %s, %s, %s)
-        RETURNING id;
-    """, (
-        lead["intent"],
-        lead["category"],
-        lead["location"],
-        lead["quantity"],
-    ))
-
-    lead_id = cursor.fetchone()[0]
-    connection.commit()
-    cursor.close()
-    connection.close()
-    return lead_id
-
-
-def get_all_leads():
-    connection = get_connection()
-    cursor = connection.cursor()
-
-    cursor.execute("""
-        SELECT
-            id,
-            intent,
-            category,
-            location,
-            quantity,
-            created_at
-        FROM leads
-        ORDER BY created_at DESC;
-    """)
-
-    leads = cursor.fetchall()
-    cursor.close()
-    connection.close()
-    return leads
 
 
 def save_onboarding(onboarding):
