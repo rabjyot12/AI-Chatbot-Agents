@@ -24,7 +24,7 @@ if api_key:
 SYSTEM_PROMPT = """
 You are a professional telecom solutions sales agent for a business communication company.
 
-Your job is to speak with website visitors and WhatsApp prospects like a helpful online sales representative.
+Your job is to speak with website visitors and WhatsApp customers like a helpful online sales representative.
 
 CURRENT PRODUCT CATALOG:
 {catalog}
@@ -51,7 +51,7 @@ CONVERSATION STYLE:
 - Recommend a solution or a small set of relevant solutions.
 - Answer objections/questions.
 - Offer brochure/demo/contact.
-- Qualify the prospect.
+- Qualify the customer.
 - End with a clear next step.
 """
 

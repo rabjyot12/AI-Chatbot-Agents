@@ -5,8 +5,8 @@ from dotenv import load_dotenv
 
 from database import (
     create_table,
-    get_all_sales_prospects,
-    save_sales_prospect,
+    get_all_sales_customers,
+    save_sales_customer,
 )
 from product_catalog import PRODUCTS
 from sales_agent import process_sales_message
@@ -85,8 +85,8 @@ if "sales_state" not in st.session_state:
         "sales_followup": False,
     }
 
-if "prospect_saved" not in st.session_state:
-    st.session_state.prospect_saved = False
+if "customer_saved" not in st.session_state:
+    st.session_state.customer_saved = False
 
 #the sidebar contains the title, description, and product information
 
@@ -128,7 +128,7 @@ with st.sidebar:
             "sales_followup": False,
         }
 
-        st.session_state.prospect_saved = False
+        st.session_state.customer_saved = False
         st.rerun()
 
 #header section with title and description
@@ -139,7 +139,7 @@ st.markdown(
         <h1>💬 Telecom AI Sales Agent</h1>
         <p>
             Conversational sales assistant for website visitors.
-            Understand the requirement → recommend a solution → qualify the prospect → hand off to sales.
+            Understand the requirement → recommend a solution → qualify the customer → hand off to sales.
         </p>
     </div>
     """,
@@ -170,14 +170,14 @@ with chat_col:
 
         st.rerun()
 
-#lead panel for capturing prospect information and sending it to the sales team
+#lead panel for capturing customer information and sending it to the sales team
 
 with lead_col:
-    st.subheader("Prospect")
+    st.subheader("Customer")
 
     state = st.session_state.sales_state
 
-    with st.form("prospect_form"):
+    with st.form("customer_form"):
         name = st.text_input("Name", value=state.get("name") or "")
         company = st.text_input("Company", value=state.get("company") or "")
         phone = st.text_input("Phone", value=state.get("phone") or "")
@@ -201,7 +201,7 @@ with lead_col:
         )
 
     if save_button:
-        prospect = {
+        customer = {
             "name": name.strip() or None,
             "company": company.strip() or None,
             "phone": phone.strip() or None,
@@ -214,34 +214,34 @@ with lead_col:
 
         if not any(
             [
-                prospect["name"],
-                prospect["company"],
-                prospect["phone"],
-                prospect["email"],
-                prospect["requirement"],
+                customer["name"],
+                customer["company"],
+                customer["phone"],
+                customer["email"],
+                customer["requirement"],
             ]
         ):
-            st.warning("Please provide at least one useful prospect detail.")
+            st.warning("Please provide at least one useful customer detail.")
         elif not db_ready:
             st.error("Database is not connected. Check the database settings.")
         else:
             try:
-                prospect_id = save_sales_prospect(prospect, channel="website")
+                customer_id = save_sales_customer(customer, channel="website")
 
-                st.session_state.sales_state.update(prospect)
-                st.session_state.prospect_saved = True
+                st.session_state.sales_state.update(customer)
+                st.session_state.customer_saved = True
 
                 st.success(
-                    f"Prospect sent to sales successfully. ID: {prospect_id}"
+                    f"Customer sent to sales successfully. ID: {customer_id}"
                 )
             except Exception as exc:
                 st.error(
-                    "The prospect was collected but could not be saved."
+                    "The customer was collected but could not be saved."
                 )
-                print("Prospect database error:", exc)
+                print("Customer database error:", exc)
 
-    if st.session_state.prospect_saved:
-        st.info("This prospect has already been saved in the database.")
+    if st.session_state.customer_saved:
+        st.info("This customer has already been saved in the database.")
 
 #brochure section for product information and download links
 
@@ -283,16 +283,16 @@ st.subheader("Sales Dashboard")
 
 if db_ready:
     try:
-        prospects = get_all_sales_prospects()
+        customers = get_all_sales_customers()
 
-        st.metric("Prospects captured", len(prospects))
+        st.metric("Customers captured", len(customers))
 
-        if prospects:
+        if customers:
             rows = []
 
-            for row in prospects:
+            for row in customers:
                 (
-                    prospect_id,
+                    customer_id,
                     name,
                     company,
                     phone,
@@ -307,7 +307,7 @@ if db_ready:
 
                 rows.append(
                     {
-                        "ID": prospect_id,
+                        "ID": customer_id,
                         "Name": name,
                         "Company": company,
                         "Phone": phone,
@@ -322,7 +322,7 @@ if db_ready:
 
             st.dataframe(rows, use_container_width=True)
         else:
-            st.info("No sales prospects have been captured yet.")
+            st.info("No sales customers have been captured yet.")
 
     except Exception as exc:
         st.error("Could not load the sales dashboard.")

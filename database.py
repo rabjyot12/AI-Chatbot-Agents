@@ -47,7 +47,7 @@ def create_table():
     """)
 
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS sales_prospects (
+        CREATE TABLE IF NOT EXISTS sales_customers (
             id SERIAL PRIMARY KEY,
             name VARCHAR(150),
             company VARCHAR(200),
@@ -127,12 +127,12 @@ def get_all_onboarding():
     return onboarding_records
 
 
-def save_sales_prospect(prospect, channel="website"):
+def save_sales_customer(customer, channel="website"):
     connection = get_connection()
     cursor = connection.cursor()
 
     cursor.execute("""
-        INSERT INTO sales_prospects (
+        INSERT INTO sales_customers (
             name,
             company,
             phone,
@@ -146,26 +146,26 @@ def save_sales_prospect(prospect, channel="website"):
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id;
     """, (
-        prospect.get("name"),
-        prospect.get("company"),
-        prospect.get("phone"),
-        prospect.get("email"),
-        prospect.get("requirement"),
-        prospect.get("interested_product"),
-        prospect.get("expected_scale"),
-        prospect.get("sales_followup", False),
+        customer.get("name"),
+        customer.get("company"),
+        customer.get("phone"),
+        customer.get("email"),
+        customer.get("requirement"),
+        customer.get("interested_product"),
+        customer.get("expected_scale"),
+        customer.get("sales_followup", False),
         channel,
     ))
 
-    prospect_id = cursor.fetchone()[0]
+    customer_id = cursor.fetchone()[0]
     connection.commit()
     cursor.close()
     connection.close()
 
-    return prospect_id
+    return customer_id
 
 
-def get_all_sales_prospects():
+def get_all_sales_customers():
     connection = get_connection()
     cursor = connection.cursor()
 
@@ -182,12 +182,12 @@ def get_all_sales_prospects():
             sales_followup,
             channel,
             created_at
-        FROM sales_prospects
+        FROM sales_customers
         ORDER BY created_at DESC;
     """)
 
-    prospects = cursor.fetchall()
+    customers = cursor.fetchall()
     cursor.close()
     connection.close()
 
-    return prospects
+    return customers

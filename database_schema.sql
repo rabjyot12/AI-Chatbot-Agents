@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS sales_prospects (
+CREATE TABLE IF NOT EXISTS sales_customers (
     id SERIAL PRIMARY KEY,
     name VARCHAR(150),
     company VARCHAR(200),

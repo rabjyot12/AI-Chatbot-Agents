@@ -14,8 +14,8 @@ A conversational AI sales-agent prototype for telecom/business communication ser
   - Voice OBD/IBD
   - IVR
   - Toll-Free
-- Prospect qualification
-- Prospect capture in PostgreSQL
+- Customer qualification
+- Customer capture in PostgreSQL
 - Simple sales dashboard
 - Product-information downloads
 - WhatsApp-ready adapter using the same conversation engine
@@ -75,7 +75,7 @@ Sales Agent
    |
    +---- Groq LLM
    |
-   +---- Prospect State
+   +---- Customer State
    |
    v
 PostgreSQL
