@@ -56,10 +56,32 @@ def create_table():
             requirement TEXT,
             interested_product VARCHAR(100),
             expected_scale VARCHAR(100),
+            conversation_summary TEXT,
+            status VARCHAR(50) DEFAULT 'new',
             sales_followup BOOLEAN DEFAULT FALSE,
             channel VARCHAR(30) DEFAULT 'website',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
+    """)
+
+    cursor.execute("""
+        ALTER TABLE sales_customers
+        ADD COLUMN IF NOT EXISTS conversation_summary TEXT;
+    """)
+
+    cursor.execute("""
+        ALTER TABLE sales_customers
+        ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'new';
+    """)
+
+    cursor.execute("""
+        ALTER TABLE sales_customers
+        ADD COLUMN IF NOT EXISTS sales_followup BOOLEAN DEFAULT FALSE;
+    """)
+
+    cursor.execute("""
+        ALTER TABLE sales_customers
+        ADD COLUMN IF NOT EXISTS channel VARCHAR(30) DEFAULT 'website';
     """)
 
     connection.commit()
@@ -140,10 +162,12 @@ def save_sales_customer(customer, channel="website"):
             requirement,
             interested_product,
             expected_scale,
+            conversation_summary,
+            status,
             sales_followup,
             channel
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id;
     """, (
         customer.get("name"),
@@ -153,6 +177,8 @@ def save_sales_customer(customer, channel="website"):
         customer.get("requirement"),
         customer.get("interested_product"),
         customer.get("expected_scale"),
+        customer.get("conversation_summary"),
+        customer.get("status", "new"),
         customer.get("sales_followup", False),
         channel,
     ))
@@ -179,6 +205,8 @@ def get_all_sales_customers():
             requirement,
             interested_product,
             expected_scale,
+            conversation_summary,
+            status,
             sales_followup,
             channel,
             created_at

@@ -7,6 +7,8 @@ CREATE TABLE IF NOT EXISTS sales_customers (
     requirement TEXT,
     interested_product VARCHAR(100),
     expected_scale VARCHAR(100),
+    conversation_summary TEXT,
+    status VARCHAR(50) DEFAULT 'new',
     sales_followup BOOLEAN DEFAULT FALSE,
     channel VARCHAR(30) DEFAULT 'website',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
