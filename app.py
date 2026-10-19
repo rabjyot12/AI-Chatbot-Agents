@@ -207,7 +207,7 @@ with chat_col:
                                 background:#171923;color:white;border-radius:10px;
                                 cursor:pointer;font-size:18px;">🔊</button>
                               <audio id="ai-audio-{message_index}" preload="auto" style="display:none">
-                                <source src="data:audio/wav;base64,{audio_b64}" type="audio/wav">
+                                <source src="data:audio/mpeg;base64,{audio_b64}" type="audio/mpeg">
                               </audio>
                             </div>
                             <script>

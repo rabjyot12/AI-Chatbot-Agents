@@ -4,10 +4,13 @@ STT: faster-whisper (runs locally on CPU).
 TTS: pyttsx3 (uses an installed operating-system voice).
 No paid speech API is used by this module.
 """
-
+import json
 import os
 import tempfile
 from functools import lru_cache
+import urllib.error
+import urllib.request
+import streamlit as st
 
 import pyttsx3
 from faster_whisper import WhisperModel
@@ -59,59 +62,82 @@ def transcribe_audio(audio_bytes: bytes, audio_format: str = "wav") -> str:
 
 
 
+
 def synthesize_speech(text: str) -> bytes:
-    """Generate WAV audio using eSpeak on Linux or pyttsx3 on Windows."""
+    """Generate natural speech using the ElevenLabs API."""
 
     text = text.strip()
     if not text:
         raise ValueError("Cannot generate speech from empty text.")
 
-    # Streamlit Cloud: use eSpeak directly, avoiding pyttsx3 voice selection.
-    espeak_path = shutil.which("espeak")
+    # Read the API key securely from Streamlit Secrets or environment.
+    api_key = os.getenv("ELEVENLABS_API_KEY")
 
-    if espeak_path:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            output_path = Path(temp_dir) / "speech.wav"
-
-            result = subprocess.run(
-                [
-                    espeak_path,
-                    "-v", "en-us",
-                    "-s", "155",
-                    "-w", str(output_path),
-                    text,
-                ],
-                capture_output=True,
-                text=True,
-                timeout=60,
-            )
-
-            if result.returncode != 0 or not output_path.exists():
-                raise RuntimeError(
-                    f"eSpeak failed: {result.stderr or 'No audio file generated'}"
-                )
-
-            audio_bytes = output_path.read_bytes()
-
-            if not audio_bytes:
-                raise RuntimeError("eSpeak generated an empty audio file.")
-
-            return audio_bytes
-
-    # Local Windows fallback: preserve the existing pyttsx3 approach.
-    import pyttsx3
-
-    with tempfile.TemporaryDirectory() as temp_dir:
-        output_path = Path(temp_dir) / "speech.wav"
-        engine = pyttsx3.init()
+    if not api_key:
         try:
-            engine.save_to_file(text, str(output_path))
-            engine.runAndWait()
-        finally:
-            engine.stop()
+            api_key = st.secrets.get("ELEVENLABS_API_KEY")
+        except Exception:
+            api_key = None
 
-        if not output_path.exists():
-            raise RuntimeError("pyttsx3 did not generate an audio file.")
+    if not api_key:
+        raise RuntimeError(
+            "ELEVENLABS_API_KEY is missing. Add it to Streamlit Cloud Secrets."
+        )
 
-        return output_path.read_bytes()
+    try:
+        voice_id = st.secrets.get(
+            "ELEVENLABS_VOICE_ID",
+            os.getenv("ELEVENLABS_VOICE_ID", "JBFqnCBsd6RMkjVDRZzb"),
+        )
+    except Exception:
+        voice_id = os.getenv(
+            "ELEVENLABS_VOICE_ID", "JBFqnCBsd6RMkjVDRZzb"
+        )
+
+    url = (
+        f"https://api.elevenlabs.io/v1/text-to-speech/"
+        f"{voice_id}?output_format=mp3_44100_128"
+    )
+
+    payload = {
+        "text": text,
+        "model_id": "eleven_multilingual_v2",
+        "voice_settings": {
+            "stability": 0.55,
+            "similarity_boost": 0.75,
+            "style": 0.2,
+            "use_speaker_boost": True,
+        },
+    }
+
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "xi-api-key": api_key,
+            "Content-Type": "application/json",
+            "Accept": "audio/mpeg",
+        },
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            audio_bytes = response.read()
+
+        if not audio_bytes:
+            raise RuntimeError("ElevenLabs returned empty audio.")
+
+        return audio_bytes
+
+    except urllib.error.HTTPError as exc:
+        error_body = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(
+            f"ElevenLabs API error ({exc.code}): {error_body}"
+        ) from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(
+            f"Could not connect to ElevenLabs: {exc.reason}"
+        ) from exc
+
 
