@@ -47,3 +47,7 @@ urllib3==2.8.0
 uvicorn==0.54.0
 watchdog==6.0.0
 websockets==16.1.1
+streamlit-mic-recorder
+faster-whisper
+pyttsx3
+av<19
