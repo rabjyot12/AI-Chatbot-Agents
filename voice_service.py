@@ -12,6 +12,15 @@ from functools import lru_cache
 import pyttsx3
 from faster_whisper import WhisperModel
 
+import ctypes.util
+import shutil
+
+def check_speech_engine():
+    return {
+        "espeak_executable": shutil.which("espeak"),
+        "espeak_library": ctypes.util.find_library("espeak"),
+    }
+
 
 @lru_cache(maxsize=1)
 def _get_whisper_model():

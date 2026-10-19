@@ -445,3 +445,8 @@ if db_ready:
         print("Dashboard error:", exc)
 else:
     st.warning("Sales dashboard is unavailable until the database connection works.")
+
+
+with st.expander("Speech engine diagnostics"):
+    from voice_service import check_speech_engine
+    st.json(check_speech_engine())
