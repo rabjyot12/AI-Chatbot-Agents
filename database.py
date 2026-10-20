@@ -149,7 +149,7 @@ def get_all_onboarding():
     return onboarding_records
 
 
-def save_sales_customer(customer, channel="website"):
+def save_sales_customer(customer, channel="website_voice"):
     connection = get_connection()
     cursor = connection.cursor()
 

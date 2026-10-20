@@ -51,3 +51,5 @@ streamlit-mic-recorder
 faster-whisper
 pyttsx3
 av<19
+fastapi
+email-validator

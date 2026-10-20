@@ -161,6 +161,39 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+
+# Live conversational voice agent
+with st.expander("🎙️ Start a live voice conversation", expanded=False):
+    st.caption(
+        "Talk naturally with our AI sales assistant. "
+        "Your existing text chat remains available below."
+    )
+
+    # Replace with the exact Agent ID shown in ElevenLabs.
+    ELEVENLABS_AGENT_ID = "agent_2901m5apm8drff0bxt5j5xg1xtzp"
+
+    if ELEVENLABS_AGENT_ID != "agent_2901m5apm8drff0bxt5j5xg1xtzp":
+        components.html(
+            f"""
+            <div style="min-height:180px;">
+                <elevenlabs-convai
+                    agent-id="{ELEVENLABS_AGENT_ID}">
+                </elevenlabs-convai>
+                <script
+                    src="https://unpkg.com/@elevenlabs/convai-widget-embed"
+                    async
+                    type="text/javascript">
+                </script>
+            </div>
+            """,
+            height=220,
+            scrolling=False,
+        )
+    else:
+        st.info(
+            "Add your ElevenLabs Agent ID here to enable live voice."
+        )
+
 chat_col, lead_col = st.columns([2.1, 1])
 
 # Conversation panel
