@@ -172,7 +172,7 @@ with st.expander("🎙️ Start a live voice conversation", expanded=False):
     # Replace with the exact Agent ID shown in ElevenLabs.
     ELEVENLABS_AGENT_ID = "agent_2901m5apm8drff0bxt5j5xg1xtzp"
 
-    if ELEVENLABS_AGENT_ID != "agent_2901m5apm8drff0bxt5j5xg1xtzp":
+    if ELEVENLABS_AGENT_ID:
         components.html(
             f"""
             <div style="min-height:180px;">
